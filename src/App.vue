@@ -1,52 +1,61 @@
 <script setup>
 import { ref } from 'vue'
+import FormComponent from './components/FormComponent.vue'
+import ResultsComponent from './components/ResultsComponent.vue'
 
-let img = '';
-const apiURL = 'https://whatscat-api.ml/v1/predict';
-const b64Img = ref('')
-const text = ref('');
-const isUploaded = ref(false);
-const formData = new FormData();
-const fileReader = new FileReader();
+const apiURL = "https://whatscat-api.ml/v1/predict";
 
 
-function onInput(e) {
-  img = e.target.files[0];
-  console.log(img)
-  isUploaded.value = !isUploaded.value;
-  fileReader.readAsDataURL(img)
-  fileReader.onload = function() {
-    b64Img.value = fileReader.result;
-  };
+let breeds = [];
+let isDone = ref(false);
+let child = ref(null);
 
-}
-
-function confirmSubmit() {
-  formData.append("img", img, img['name']);
-  const requestOptions = {
+function uploadImg() {
+  let formData = new FormData();
+  let imgFile = child.value['img']['inputImg'];
+  formData.append("img", imgFile, imgFile['name']);
+  let requestOptions = {
     method: 'POST',
     body: formData
   };
 
   fetch(apiURL, requestOptions)
-  .then(response => 
-    response.text(),
-    text.value = 'loading...'
-  )
+  .then(response => response.json())
   .then(result =>
-    text.value = result
+    processResult(result)
   )
   .catch(error => console.log(error));
+
 }
+
+function processResult(rawData) {
+  let predictions = rawData['predictions'];
+  
+  const numOfResult = 3;
+  for (let i = 0; i < numOfResult; i++) {
+    breeds.push({
+      id: i + 1,
+      name: predictions[i][1],
+      percentage: predictions[i][0] * 100
+    });
+  }
+  console.log(breeds)
+  isDone.value = !isDone.value;
+}
+
+function tryAgain() {
+  location.reload()
+}
+
 </script>
 
 <template>
-  <img v-if="isUploaded" :src="b64Img" alt="" accept="*/image" width="640" height="360">
-  <input type="file" @change="onInput" placeholder="Type here">
-  <button :disabled="!isUploaded" @click="confirmSubmit">Upload Image</button>
-  
-  <p v-if="isUploaded">{{ text }}</p>
-  <p v-else>
-    Upload Image
-  </p>
+  <div v-if="!isDone">
+    <FormComponent ref="child" />
+    <button @click="uploadImg">Upload Image</button>
+  </div>
+  <div v-if="isDone">
+    <ResultsComponent :results="breeds" />
+    <button @click="tryAgain">Try Again</button>
+  </div>
 </template>
